@@ -1,10 +1,12 @@
 name: NougatMaker CI
 
 on:
-  push:
-    branches:
-      - main
-      - github-actions
+  workflow_dispatch:
+    inputs:
+      push_to_nuget_org:
+        description: 'Push to nuget.org'
+        required: false
+        type: boolean
 
 jobs:
   build:
@@ -102,6 +104,18 @@ jobs:
             dotnet nuget push artifacts/*.nupkg --source nuget-all --skip-duplicate
           else
             echo "Artifactory credentials not set; skipping push"
+          fi
+
+      - name: Push to NuGet.org
+        if: (github.ref_name == 'main' || github.event.inputs.push_to_nuget_org == 'true') && !startsWith(github.ref_name, 'dependabot')
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          if [ -n "${NUGET_API_KEY:-}" ]; then
+            dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          else
+            echo "NuGet.org API key not set; skipping push"
           fi
 
       - name: Remove Artifactory NuGet source (optional)
